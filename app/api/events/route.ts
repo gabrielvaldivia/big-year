@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getFreshGoogleAccountsForUser } from "@/lib/google-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,14 @@ export async function GET(req: Request) {
     .filter(Boolean);
 
   const session = await getServerSession(authOptions);
-  if (!session || !(session as any).accessToken) {
+  if (!session?.user?.id) {
     return NextResponse.json({ events: [] }, { status: 200 });
   }
 
-  const accessToken = (session as any).accessToken as string;
+  const accounts = await getFreshGoogleAccountsForUser((session as any).user.id as string);
+  if (accounts.length === 0) {
+    return NextResponse.json({ events: [] }, { status: 200 });
+  }
 
   const params = new URLSearchParams({
     singleEvents: "true",
@@ -38,29 +42,47 @@ export async function GET(req: Request) {
     maxResults: "2500",
   });
 
-  const idsToFetch = calendarIds.length > 0 ? calendarIds : ["primary"];
-  const fetches = idsToFetch.map(async (cid) => {
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-      cid
-    )}/events?${params.toString()}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      return { items: [] as any[] };
+  // calendarIds are composite: `${accountId}|${calendarId}`
+  const idsByAccount = new Map<string, string[]>();
+  if (calendarIds.length > 0) {
+    for (const comp of calendarIds) {
+      const [accId, calId] = comp.split("|");
+      if (!accId || !calId) continue;
+      const arr = idsByAccount.get(accId) ?? [];
+      arr.push(calId);
+      idsByAccount.set(accId, arr);
     }
-    const data = await res.json();
-    return { items: data.items || [], calendarId: cid };
-  });
+  }
+  const fetches: Promise<any>[] = [];
+  for (const acc of accounts) {
+    const cals =
+      idsByAccount.size > 0
+        ? idsByAccount.get(acc.accountId) || []
+        : ["primary"];
+    for (const calId of cals) {
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        calId
+      )}/events?${params.toString()}`;
+      fetches.push(
+        fetch(url, {
+          headers: { Authorization: `Bearer ${acc.accessToken}` },
+          cache: "no-store",
+        }).then(async (res) => {
+          if (!res.ok) return { items: [], calendarId: calId, accountId: acc.accountId };
+          const data = await res.json();
+          return { items: data.items || [], calendarId: calId, accountId: acc.accountId };
+        })
+      );
+    }
+  }
  
   const results = await Promise.all(fetches);
   const events = results.flatMap((r) =>
     (r.items || [])
       .filter((e: any) => e?.start?.date && e.status !== "cancelled")
       .map((e: any) => ({
-        id: `${r.calendarId || "primary"}:${e.id}`,
-        calendarId: r.calendarId || "primary",
+        id: `${r.accountId || "primary"}|${r.calendarId || "primary"}:${e.id}`,
+        calendarId: `${r.accountId || "primary"}|${r.calendarId || "primary"}`,
         summary: e.summary || "(Untitled)",
         startDate: e.start.date as string,
         endDate: e.end?.date as string,

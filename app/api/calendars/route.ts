@@ -35,6 +35,7 @@ export async function GET() {
       summary: (c.summary as string) || "(Untitled)",
       primary: !!c.primary,
       backgroundColor: c.backgroundColor as string | undefined,
+      accessRole: c.accessRole as string | undefined,
     }))
   );
   return NextResponse.json({ calendars });

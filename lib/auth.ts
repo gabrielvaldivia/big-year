@@ -70,7 +70,7 @@ export const authOptions: NextAuthOptions = {
         url: GOOGLE_AUTHORIZATION_URL,
         params: {
           scope:
-            "openid email profile https://www.googleapis.com/auth/calendar.readonly",
+            "openid email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events",
         },
       },
     }),
@@ -79,6 +79,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account, user }) {
       // When a (re)sign-in occurs, add/update this Google account in the token.googleAccounts array.
       if (account) {
+        const expiresInSecRaw = (account as any)?.expires_in;
+        const expiresInSec =
+          typeof expiresInSecRaw === "number"
+            ? expiresInSecRaw
+            : typeof expiresInSecRaw === "string"
+              ? parseInt(expiresInSecRaw, 10)
+              : undefined;
         const acctId = account.providerAccountId as string;
         const existing = (token.googleAccounts as any[]) || [];
         const updated = existing.filter((a) => a.accountId !== acctId);
@@ -88,14 +95,14 @@ export const authOptions: NextAuthOptions = {
           accessToken: account.access_token as string,
           refreshToken: (account.refresh_token as string) || undefined,
           accessTokenExpires:
-            Date.now() + (account.expires_in ? account.expires_in * 1000 : 3600 * 1000),
+            Date.now() + (expiresInSec ? expiresInSec * 1000 : 3600 * 1000),
         });
         token.googleAccounts = updated;
         // Keep backward compat single-token fields to the latest account
         token.accessToken = account.access_token as string;
         token.refreshToken = (account.refresh_token as string) || token.refreshToken;
         token.accessTokenExpires =
-          Date.now() + (account.expires_in ? account.expires_in * 1000 : 3600 * 1000);
+          Date.now() + (expiresInSec ? expiresInSec * 1000 : 3600 * 1000);
         token.user = user;
         return token;
       }
@@ -128,8 +135,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       (session as any).accessToken = token.accessToken;
       (session as any).googleAccounts = token.googleAccounts || [];
-      // @ts-expect-error - assign user from token
-      session.user = token.user;
+      (session as any).user = token.user;
       // Ensure session.user.id is present (Prisma adapter provides)
       return session;
     },

@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 export type AllDayEvent = {
   id: string;
@@ -102,11 +103,15 @@ export function YearCalendar({
   events,
   signedIn,
   calendarColors = {},
+  calendarNames = {},
+  calendarAccounts = {},
 }: {
   year: number;
   events: AllDayEvent[];
   signedIn: boolean;
   calendarColors?: Record<string, string>;
+  calendarNames?: Record<string, string>;
+  calendarAccounts?: Record<string, string>;
 }) {
   const todayKey = formatDateKey(new Date());
   const dateMap = useMemo(() => expandEventsToDateMap(events), [events]);
@@ -400,8 +405,37 @@ export function YearCalendar({
           aria-label="Event details"
         >
           <div className="px-3 py-2 font-medium">{popover.event.summary}</div>
-          <div className="p-3 text-sm text-muted-foreground">
-            {formatDisplayRange(popover.event.startDate, popover.event.endDate)}
+          <div className="px-3 text-sm text-muted-foreground flex items-center gap-2">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{
+                backgroundColor:
+                  (popover.event.calendarId &&
+                    calendarColors[popover.event.calendarId]) ||
+                  "hsl(var(--secondary))",
+              }}
+            />
+            <span className="truncate">
+              {(popover.event.calendarId &&
+                calendarNames[popover.event.calendarId]) ||
+                "Calendar"}
+              {popover.event.calendarId &&
+                calendarAccounts &&
+                calendarAccounts[popover.event.calendarId] && (
+                  <span className="ml-1 text-muted-foreground">
+                    ({calendarAccounts[popover.event.calendarId]})
+                  </span>
+                )}
+            </span>
+          </div>
+          <div className="px-3 pb-3 mt-1.5 text-sm text-muted-foreground flex items-center gap-2">
+            <CalendarIcon className="h-2.5 w-2.5" />
+            <span>
+              {formatDisplayRange(
+                popover.event.startDate,
+                popover.event.endDate
+              )}
+            </span>
           </div>
         </div>
       )}

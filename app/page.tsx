@@ -3,6 +3,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { YearCalendar, AllDayEvent } from "@/components/year-calendar";
+import { ChevronLeft, ChevronRight, Unlink, Plus } from "lucide-react";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -22,6 +23,20 @@ export default function HomePage() {
       map.set(key, arr);
     }
     return Array.from(map.entries());
+  }, [calendars]);
+  const calendarNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of calendars) {
+      map[c.id] = c.summary;
+    }
+    return map;
+  }, [calendars]);
+  const calendarAccounts = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of calendars) {
+      if (c.accountEmail) map[c.id] = c.accountEmail;
+    }
+    return map;
   }, [calendars]);
 
   useEffect(() => {
@@ -60,14 +75,15 @@ export default function HomePage() {
       .then((data) => {
         const list = (data.calendars || []) as { id: string; summary: string; primary?: boolean; backgroundColor?: string; accountEmail?: string }[];
         setCalendars(list);
-        // Merge previously selected with newly available calendars (add, don't replace)
+        // Restore previous selection; if none stored, default to all
         const allIds = list.map((c) => c.id);
         let prev: string[] = [];
         try {
           prev = JSON.parse(localStorage.getItem("selectedCalendarIds") || "[]") || [];
         } catch {}
-        const merged = Array.from(new Set([...prev.filter((id) => allIds.includes(id)), ...allIds]));
-        setSelectedCalendarIds(merged);
+        const restored =
+          prev.length > 0 ? prev.filter((id) => allIds.includes(id)) : allIds;
+        setSelectedCalendarIds(restored);
         // Load colors from localStorage, default to API backgroundColor or a soft palette
         try {
           const stored = JSON.parse(localStorage.getItem("calendarColors") || "{}");
@@ -109,13 +125,54 @@ export default function HomePage() {
     }
     try {
       setIsRefreshing(true);
-      const res = await fetch(`/api/events?year=${year}${selectedCalendarIds.length ? `&calendarIds=${encodeURIComponent(selectedCalendarIds.join(','))}` : ""}`, { cache: "no-store" });
-      const data = await res.json();
-      setEvents(data.events || []);
+      // 1) Reload calendars from all linked accounts
+      const calendarsRes = await fetch(`/api/calendars`, { cache: "no-store" });
+      const calendarsData = await calendarsRes.json();
+      const newCalendars = (calendarsData.calendars || []) as {
+        id: string;
+        summary: string;
+        primary?: boolean;
+        backgroundColor?: string;
+        accountEmail?: string;
+      }[];
+      setCalendars(newCalendars);
+      // Keep existing selection; don't auto-select new calendars
+      const allIds = newCalendars.map((c) => c.id);
+      const mergedSelected = selectedCalendarIds.filter((id) => allIds.includes(id));
+      setSelectedCalendarIds(mergedSelected);
+      try {
+        localStorage.setItem("selectedCalendarIds", JSON.stringify(mergedSelected));
+      } catch {}
+      // Merge default colors for any new calendars
+      const nextColors: Record<string, string> = { ...calendarColors };
+      for (const c of newCalendars) {
+        if (!nextColors[c.id]) nextColors[c.id] = c.backgroundColor || "#cbd5e1";
+      }
+      setCalendarColors(nextColors);
+      try {
+        localStorage.setItem("calendarColors", JSON.stringify(nextColors));
+      } catch {}
+      // 2) Reload events for the current year using the merged selection
+      const qs = `/api/events?year=${year}${mergedSelected.length ? `&calendarIds=${encodeURIComponent(mergedSelected.join(","))}` : ""}`;
+      const eventsRes = await fetch(qs, { cache: "no-store" });
+      const eventsData = await eventsRes.json();
+      setEvents(eventsData.events || []);
     } catch {
       // keep existing events on failure
     } finally {
       setIsRefreshing(false);
+    }
+  };
+  const disconnectAccount = async (accountId: string) => {
+    try {
+      await fetch("/api/accounts/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      await onRefresh();
+    } catch {
+      // ignore
     }
   };
 
@@ -128,12 +185,12 @@ export default function HomePage() {
           </Button>
         </div>
         <div className="flex items-center justify-center gap-2">
-          <Button variant="secondary" onClick={onPrev} aria-label="Previous year">
-            ←
+          <Button variant="ghost" size="icon" className="hover:bg-transparent" onClick={onPrev} aria-label="Previous year">
+            <ChevronLeft className="h-5 w-5" />
           </Button>
-          <div className="font-semibold text-lg min-w-[5ch] text-center">{year}</div>
-          <Button variant="secondary" onClick={onNext} aria-label="Next year">
-            →
+          <div className="font-semibold text-lg min-w-[5ch] text-center leading-none">{year}</div>
+          <Button variant="ghost" size="icon" className="hover:bg-transparent" onClick={onNext} aria-label="Next year">
+            <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
         <div />
@@ -168,8 +225,26 @@ export default function HomePage() {
               {status === "authenticated" ? (
                 calendarsByEmail.map(([email, list]) => (
                   <div key={email} className="space-y-1">
-                    <div className="px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      {email}
+                    <div className="px-2 pt-3 pb-1 flex items-center justify-between">
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        {email}
+                      </div>
+                      {list.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                          aria-label={`Disconnect ${email}`}
+                          title={`Disconnect ${email}`}
+                          onClick={() => {
+                            const first = list[0];
+                            const accountId = first.id.split("|")[0];
+                            disconnectAccount(accountId);
+                          }}
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                     {list.map((c) => {
                       const checked = selectedCalendarIds.includes(c.id);
@@ -215,16 +290,17 @@ export default function HomePage() {
               {status === "authenticated" && (
                 <div className="px-2 py-3">
                   <Button
-                    variant="link"
+                    variant="secondary"
                     size="sm"
-                    className="px-0"
+                    className="w-full justify-center gap-2"
                     onClick={() => {
                       import("next-auth/react").then(({ signIn }) =>
                         signIn("google", { callbackUrl: window.location.href })
                       );
                     }}
                   >
-                    Add Google account
+                    <Plus className="h-4 w-4" />
+                    <span>Add Google account</span>
                   </Button>
                 </div>
               )}
@@ -244,7 +320,14 @@ export default function HomePage() {
         </>
       )}
       <div className="flex-1 min-h-0">
-        <YearCalendar year={year} events={events} signedIn={status === "authenticated"} calendarColors={calendarColors} />
+        <YearCalendar
+          year={year}
+          events={events}
+          signedIn={status === "authenticated"}
+          calendarColors={calendarColors}
+          calendarNames={calendarNames}
+          calendarAccounts={calendarAccounts}
+        />
       </div>
     </div>
   );

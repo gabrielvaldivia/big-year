@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, X } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
@@ -675,8 +675,17 @@ export function YearCalendar({
             </>
           ) : (
             <>
-              <div className="px-3 py-2 font-medium">
-                {popover.event.summary}
+              <div className="px-3 py-2 flex items-center justify-between">
+                <div className="font-medium truncate flex-1">
+                  {popover.event.summary}
+                </div>
+                <button
+                  className="text-muted-foreground hover:text-foreground flex-shrink-0 ml-2"
+                  onClick={() => setPopover({ event: null, x: 0, y: 0 })}
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
               <div className="px-3 text-sm text-muted-foreground flex items-center gap-2">
                 <span

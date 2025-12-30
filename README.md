@@ -1,4 +1,4 @@
-# Big Ass Calendar
+# Yearly Calendar
 
 Full-screen yearly calendar that shows only all-day events from your Google Calendar. Built with Next.js (App Router), Tailwind CSS, and shadcn-style UI components.
 
@@ -24,6 +24,7 @@ GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 For local development, you can use a local PostgreSQL database or a free hosted option like [Neon](https://neon.tech) or [Supabase](https://supabase.com).
 
 3. Configure your Google OAuth app:
+
    - App type: Web application
    - Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
    - Scopes: `openid email profile https://www.googleapis.com/auth/calendar.readonly`
@@ -41,6 +42,3 @@ Open `http://localhost:3000`, sign in with Google, and you’ll see your all-day
 - Only all-day events are fetched: events with `start.date` (not `start.dateTime`) are included.
 - Access tokens are automatically refreshed using the Google refresh token.
 - The calendar auto-fills the entire viewport (full width and height).
-
-
-

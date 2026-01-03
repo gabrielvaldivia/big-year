@@ -353,8 +353,7 @@ export function YearCalendar({
                   "relative bg-background p-1 min-w-0 min-h-0 overflow-hidden",
                   isWeekend &&
                     'bg-white before:content-[""] before:absolute before:inset-0 before:bg-[rgba(0,0,0,0.02)] before:pointer-events-none',
-                  isToday && "ring-1 ring-primary",
-                  onDayClick && "cursor-pointer"
+                  isToday && "ring-1 ring-primary"
                 )}
                 title={date.toDateString()}
                 onClick={(e) => {
@@ -467,7 +466,7 @@ export function YearCalendar({
                       width,
                       height: laneHeight - 2,
                     }}
-                    className="px-1 pointer-events-auto"
+                    className="px-1 pointer-events-auto cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       const rect = (

@@ -174,6 +174,120 @@ For complete removal of warnings and a verified badge:
 
 **Important**: The privacy policy and terms pages are already created at `/privacy` and `/terms`. Make sure your app is deployed so these URLs are accessible before submitting for verification.
 
+## Fixing Domain Verification Issues
+
+If you see an error in Google Cloud Console that says "The website of your home page URL 'https://bigyear.app' is not registered to you", you need to verify domain ownership.
+
+### Step 1: Add Domain to Authorized Domains
+
+1. Go to [Google Cloud Console OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+2. Scroll down to the **App domain** section
+3. Under **Authorized domains**, make sure `bigyear.app` is listed
+4. If it's not there, click **+ ADD DOMAIN** and add `bigyear.app`
+5. Save the changes
+
+### Step 2: Verify Domain Ownership
+
+Google needs to verify that you own the domain. There are two main methods:
+
+#### Method 1: HTML File Upload (Recommended for Vercel)
+
+**How to Verify Domain Ownership:**
+
+The "Learn more" link in the modal takes you to documentation, not the verification interface. To actually verify domain ownership, you need to use **Google Search Console**. Here's how:
+
+**Most Likely Solution: Verify Domain in Google Search Console**
+
+Google often requires domain verification through Search Console before it can be used in OAuth. To get the HTML file upload option:
+
+1. Go to [Google Search Console](https://search.google.com/search-console)
+2. Click **"Add property"** or use the property selector at the top
+3. **Important:** Select **"URL prefix"** (not "Domain") to get HTML file upload option
+4. Enter: `https://bigyear.app`
+5. Click **"Continue"**
+6. You'll see verification method options - choose **"HTML file upload"**
+7. Google will provide:
+   - A filename like `google1234567890.html`
+   - HTML content to put in that file
+8. Create the file in your project's `public` folder (see steps below)
+9. Deploy to Vercel
+10. Go back to Search Console and click **"Verify"**
+11. Once verified in Search Console, return to the OAuth consent screen Branding page - the domain should now be recognized and the verification issue should be resolved
+
+**Note:** If you already selected "Domain" and see DNS verification, you can either:
+
+- Use the DNS method (add the TXT record to your domain's DNS settings), OR
+- Remove that property and add a new one using "URL prefix" to get the HTML file upload option
+
+**Alternative: Try Verification Center**
+
+1. Close the modal
+2. Click on **"Verification Center"** in the left sidebar (under Google Auth Platform)
+3. This should show you all verification requirements and issues
+4. Look for domain verification options there
+
+**If you don't see the verification option:**
+
+- Make sure you've saved the domain in the Authorized domains section first
+- Try refreshing the page
+- The verification option may appear after a few minutes
+- Look for a "Verify ownership" or "Verify domain" button/link
+
+**After selecting HTML file upload:**
+
+1. Google will show you the filename and HTML content
+2. Copy both the filename and the HTML content
+3. In your project:
+   - Create a `public` folder in your project root (if it doesn't exist)
+   - Create the file `public/google1234567890.html` (use the exact filename Google provides)
+   - Paste the exact HTML content Google provides into that file
+4. Deploy to Vercel
+5. The file will be accessible at `https://bigyear.app/google1234567890.html`
+6. Go back to Google Cloud Console and click **Verify** or **Test** to verify the file is accessible
+7. Once verified, the domain ownership status will update
+
+**Alternative Method - Using Route Handler:**
+
+If you prefer using a route handler instead of the public folder:
+
+1. Create `app/google[your-verification-code]/route.ts` (replace `[your-verification-code]` with the actual code)
+2. Use this template:
+
+```typescript
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return new NextResponse(
+    '<meta name="google-site-verification" content="YOUR_CONTENT_HERE" />',
+    {
+      headers: { "Content-Type": "text/html" },
+    }
+  );
+}
+```
+
+3. Replace `YOUR_CONTENT_HERE` with the exact HTML content Google provides
+4. Add a rewrite in `next.config.mjs` to map `/google[code].html` to `/google[code]`
+5. Deploy and verify
+
+#### Method 2: DNS TXT Record
+
+1. In Google Cloud Console, select the DNS verification method
+2. Google will provide a TXT record to add to your DNS
+3. Add the TXT record to your domain's DNS settings (wherever you manage DNS for `bigyear.app`)
+4. Wait for DNS propagation (can take a few minutes to 48 hours)
+5. Click **Verify** in Google Cloud Console
+
+### Step 3: After Verification
+
+Once verified:
+
+1. The branding verification issue should be resolved
+2. You can proceed with app verification if needed
+3. The domain will be marked as verified in Google Cloud Console
+
+**Note**: If you're using Vercel, the HTML file method is usually easier since you can create a route to serve the verification file directly.
+
 ## Fixing Google Cloud Console Security Alerts
 
 If you see security alerts in Google Cloud Console's "Project Checkup", here's how to fix them:

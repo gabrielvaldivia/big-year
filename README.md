@@ -45,7 +45,7 @@ When deploying to Vercel, you need to configure both your Vercel environment var
 
 In your Vercel project dashboard, go to **Settings** → **Environment Variables** and ensure you have:
 
-- `NEXTAUTH_URL` = `https://big-year.vercel.app` (or your custom domain)
+- `NEXTAUTH_URL` = `https://bigyear.app` (or your custom domain)
 - `NEXTAUTH_SECRET` = a strong random string (generate with `openssl rand -base64 32`)
 - `GOOGLE_CLIENT_ID` = your Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` = your Google OAuth client secret
@@ -59,7 +59,7 @@ In your [Google Cloud Console](https://console.cloud.google.com/apis/credentials
 
 1. Go to your OAuth 2.0 Client ID
 2. Under **Authorized redirect URIs**, add:
-   - `https://big-year.vercel.app/api/auth/callback/google` (or your custom domain)
+   - `https://bigyear.app/api/auth/callback/google` (or your custom domain)
 3. Save the changes
 
 **Note**: You can have multiple redirect URIs - one for local development (`http://localhost:3000/api/auth/callback/google`) and one for production.
@@ -67,6 +67,61 @@ In your [Google Cloud Console](https://console.cloud.google.com/apis/credentials
 ### 3. Redeploy
 
 After updating the environment variables and Google OAuth settings, trigger a new deployment in Vercel (or push a commit) to apply the changes.
+
+## Fixing "Esta aplicación está bloqueada" / "This application is blocked" Error
+
+If users are seeing a Google security warning that says "Esta aplicación está bloqueada" (This application is blocked), this means Google is blocking access to sensitive scopes. Here's how to fix it:
+
+### Critical: Publish Your App
+
+**The most common cause is that your app is still in "Testing" mode.** When an app is in testing mode, only users added to the test users list can access it. All other users will see the blocked error.
+
+1. Go to [Google Cloud Console OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+2. Check the **Publishing status** section at the top
+3. If it says "Testing", click **Publish App**
+4. Confirm the publishing
+5. **Important**: After publishing, wait 5-10 minutes for changes to propagate
+
+### Verify OAuth Consent Screen Configuration
+
+Make sure your OAuth consent screen is fully configured:
+
+1. Go to [Google Cloud Console OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+2. Verify all required fields are filled:
+   - **App name**: Big Year (or your preferred name)
+   - **User support email**: Your email address
+   - **Developer contact information**: Your email address
+   - **Application home page**: `https://bigyear.app`
+   - **Privacy Policy link**: `https://bigyear.app/privacy`
+   - **Terms of Service link**: `https://bigyear.app/terms`
+3. Under **Scopes**, ensure these are all listed:
+   - `openid`
+   - `email`
+   - `profile`
+   - `https://www.googleapis.com/auth/calendar.readonly`
+   - `https://www.googleapis.com/auth/calendar.events` ⚠️ **This is a sensitive scope**
+4. **Check for region restrictions**: Scroll down to see if there are any country/region restrictions enabled. If you want global access, make sure no countries are blocked.
+5. Save all changes
+
+### Why This Happens
+
+The app requests `calendar.events` scope, which allows write access to calendars. Google considers this a **sensitive scope** and requires:
+- The app to be published (not in testing mode)
+- Proper OAuth consent screen configuration
+- Eventually, full verification for complete removal of warnings
+
+### After Publishing
+
+- The app will be available to all Google users worldwide
+- Users may still see a brief "unverified app" warning, but they can proceed
+- For complete removal of warnings, submit for verification (see below)
+
+### International Access Notes
+
+- **Google OAuth doesn't restrict by country/region by default**, but unverified apps with sensitive scopes may show different warnings in different regions
+- If users in specific countries are blocked, check the OAuth consent screen for any country restrictions
+- The error message language (e.g., Spanish "Esta aplicación está bloqueada") reflects the user's Google account language preference, not a regional restriction
+- Publishing the app and completing verification ensures access for users worldwide
 
 ## Removing "Unverified App" Warnings
 
@@ -81,11 +136,11 @@ To remove the Google "unverified app" warning screens, you need to configure you
    - **App name**: Big Year (or your preferred name)
    - **User support email**: gabe@valdivia.works (your email)
    - **Developer contact information**: gabe@valdivia.works
-   - **App domain** (optional): big-year.vercel.app
-   - **Authorized domains**: Add `vercel.app` (or your custom domain)
-   - **Application home page**: `https://big-year.vercel.app`
-   - **Privacy Policy link**: `https://big-year.vercel.app/privacy`
-   - **Terms of Service link**: `https://big-year.vercel.app/terms`
+   - **App domain** (optional): bigyear.app
+   - **Authorized domains**: Add `bigyear.app` (or your custom domain)
+   - **Application home page**: `https://bigyear.app`
+   - **Privacy Policy link**: `https://bigyear.app/privacy`
+   - **Terms of Service link**: `https://bigyear.app/terms`
 4. Under **Scopes**, add:
    - `openid`
    - `email`

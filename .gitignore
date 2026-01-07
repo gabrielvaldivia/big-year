@@ -4,5 +4,8 @@ node_modules
 .env.local
 .DS_Store
 
-
+# Database files
+*.db
+*.db-journal
+prisma/dev.db
 

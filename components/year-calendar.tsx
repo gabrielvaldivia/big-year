@@ -941,21 +941,19 @@ export function YearCalendar({
                     </div>
                   )}
                 </div>
-                {!isMobile && (
-                  <button
-                    className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setPopover({ event: null, x: 0, y: 0 });
-                      setMenuOpen(false);
-                      setMenuPosition(null);
-                    }}
-                    disabled={isSubmitting}
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+                <button
+                  className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setPopover({ event: null, x: 0, y: 0 });
+                    setMenuOpen(false);
+                    setMenuPosition(null);
+                  }}
+                  disabled={isSubmitting}
+                  aria-label="Close"
+                >
+                  <X className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
+                </button>
               </div>
             </div>
             <div

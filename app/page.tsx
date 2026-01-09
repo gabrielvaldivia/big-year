@@ -821,22 +821,20 @@ export default function HomePage() {
               >
                 Event
               </div>
-              {!isMobile && (
-                <button
-                  className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!createSubmitting) {
-                      setCreateOpen(false);
-                    }
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label="Close"
-                  disabled={createSubmitting}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+              <button
+                className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!createSubmitting) {
+                    setCreateOpen(false);
+                  }
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label="Close"
+                disabled={createSubmitting}
+              >
+                <X className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
+              </button>
           </div>
           <div
             className={cn(

@@ -561,13 +561,13 @@ export function YearCalendar({
                 }}
               >
                 {isFirstOfMonth && cellWidth > 60 && (
-                  <div className="absolute top-1 left-1 text-[10px] leading-none uppercase tracking-wide text-primary">
+                  <div className="absolute top-0 left-0 bg-black text-white text-[10px] leading-none uppercase tracking-wide px-1.5 py-0.5">
                     {monthShort[date.getMonth()]}
                   </div>
                 )}
                 <div
                   className={cn(
-                    "absolute top-1 text-[10px] leading-none text-muted-foreground",
+                    "absolute top-0.5 text-[10px] leading-none text-muted-foreground",
                     cellWidth > 60 ? "right-1 text-right" : "left-1 text-left",
                     isToday && "text-primary font-semibold"
                   )}
@@ -941,19 +941,21 @@ export function YearCalendar({
                     </div>
                   )}
                 </div>
-                <button
-                  className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setPopover({ event: null, x: 0, y: 0 });
-                    setMenuOpen(false);
-                    setMenuPosition(null);
-                  }}
-                  disabled={isSubmitting}
-                  aria-label="Close"
-                >
-                  <X className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
-                </button>
+                {!isMobile && (
+                  <button
+                    className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setPopover({ event: null, x: 0, y: 0 });
+                      setMenuOpen(false);
+                      setMenuPosition(null);
+                    }}
+                    disabled={isSubmitting}
+                    aria-label="Close"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
             <div
@@ -980,7 +982,7 @@ export function YearCalendar({
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   disabled={isSubmitting}
-                  autoFocus
+                  autoFocus={!isMobile}
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -1226,39 +1228,78 @@ export function YearCalendar({
       )}
 
       {!signedIn && (
-        <div className="fixed inset-0 flex items-center justify-center bg-background/70">
-          <div className="w-[400px] max-w-[80vw] rounded-md border bg-card p-5 md:p-12 text-center shadow-sm pointer-events-auto">
-            <div className="text-lg font-medium mb-1">Big Year</div>
-            <div className="text-sm text-muted-foreground mb-4">
-              A calendar for all-day events.
-            </div>
-            <Button
-              className="w-full"
-              onClick={() => {
-                const callbackUrl =
-                  typeof window !== "undefined" ? window.location.href : "/";
-                signIn("google", { callbackUrl });
-              }}
-            >
-              Sign in with Google
-            </Button>
-            <div className="mt-6 flex items-center justify-center gap-3 text-xs text-muted-foreground">
-              <Link
-                href="/privacy"
-                className="hover:text-foreground transition-colors"
+        <>
+          <div className="fixed inset-0 bg-background/60 z-40" aria-hidden />
+          {isMobile ? (
+            <div className="fixed bottom-0 left-0 right-0 w-full rounded-t-3xl rounded-b-none border bg-card shadow-lg pointer-events-auto z-50 px-6 py-6 text-center">
+              <div className="text-xl font-medium mb-1">Big Year</div>
+              <div className="text-base text-muted-foreground mb-4">
+                A calendar for all-day events.
+              </div>
+              <Button
+                className="w-full text-base py-6"
+                onClick={() => {
+                  const callbackUrl =
+                    typeof window !== "undefined" ? window.location.href : "/";
+                  signIn("google", { callbackUrl });
+                }}
               >
-                Privacy Policy
-              </Link>
-              <span>•</span>
-              <Link
-                href="/terms"
-                className="hover:text-foreground transition-colors"
-              >
-                Terms of Service
-              </Link>
+                Sign in with Google
+              </Button>
+              <div className="mt-6 flex items-center justify-center gap-3 text-sm text-muted-foreground">
+                <Link
+                  href="/privacy"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+                <span>•</span>
+                <Link
+                  href="/terms"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Terms of Service
+                </Link>
+              </div>
             </div>
-          </div>
-        </div>
+          ) : (
+            <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+              <div className="w-[400px] max-w-[80vw] rounded-md border bg-card p-5 md:p-12 text-center shadow-sm pointer-events-auto">
+                <div className="text-lg font-medium mb-1">Big Year</div>
+                <div className="text-sm text-muted-foreground mb-4">
+                  A calendar for all-day events.
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    const callbackUrl =
+                      typeof window !== "undefined"
+                        ? window.location.href
+                        : "/";
+                    signIn("google", { callbackUrl });
+                  }}
+                >
+                  Sign in with Google
+                </Button>
+                <div className="mt-6 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                  <Link
+                    href="/privacy"
+                    className="hover:text-foreground transition-colors"
+                  >
+                    Privacy Policy
+                  </Link>
+                  <span>•</span>
+                  <Link
+                    href="/terms"
+                    className="hover:text-foreground transition-colors"
+                  >
+                    Terms of Service
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

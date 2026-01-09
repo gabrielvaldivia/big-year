@@ -294,6 +294,82 @@ export default function HomePage() {
     }
   }, [createOpen, isMobile]);
 
+  // Add non-passive touch event listeners for drag-to-dismiss
+  useEffect(() => {
+    if (!isMobile || !createModalRef.current) return;
+
+    const modal = createModalRef.current;
+    const headerHeight = 80;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (createSubmitting) return;
+      const touch = e.touches[0];
+      const target = e.target as HTMLElement;
+      
+      const isHeaderElement =
+        target.closest('[aria-label="Close"]') ||
+        target.closest("button[class*='p-1']");
+      
+      // Don't start dragging if clicking a button
+      if (isHeaderElement) return;
+
+      const rect = modal.getBoundingClientRect();
+      const touchY = touch.clientY - rect.top;
+      const scrollTop = modal.scrollTop;
+
+      const isInHeader = touchY < headerHeight && scrollTop === 0;
+
+      if (isInHeader) {
+        setCreateIsDragging(true);
+        createDragStartY.current = touch.clientY;
+        createDragStartOffset.current = createDragOffset;
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!createIsDragging || createSubmitting) return;
+      const touch = e.touches[0];
+      const deltaY = touch.clientY - createDragStartY.current;
+      const newOffset = Math.max(0, createDragStartOffset.current + deltaY);
+      setCreateDragOffset(newOffset);
+      e.preventDefault();
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!createIsDragging) return;
+      const target = e.target as HTMLElement;
+      const isHeaderElement =
+        target.closest('[aria-label="Close"]') ||
+        target.closest("button[class*='p-1']");
+      
+      setCreateIsDragging(false);
+
+      const threshold = Math.min(100, window.innerHeight * 0.2);
+      if (createDragOffset > threshold) {
+        setCreateOpen(false);
+        setTimeout(() => setCreateDragOffset(0), 300);
+      } else {
+        setCreateDragOffset(0);
+      }
+      
+      // Don't prevent default if clicking a button, so onClick can fire
+      if (!isHeaderElement) {
+        e.preventDefault();
+      }
+    };
+
+    modal.addEventListener("touchstart", handleTouchStart, { passive: false });
+    modal.addEventListener("touchmove", handleTouchMove, { passive: false });
+    modal.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+    return () => {
+      modal.removeEventListener("touchstart", handleTouchStart);
+      modal.removeEventListener("touchmove", handleTouchMove);
+      modal.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isMobile, createSubmitting, createIsDragging, createDragOffset, createOpen]);
+
   // Handle calendar selection when both calendars and preferences are loaded
   // This runs when preferences finish loading (if calendars are already loaded)
   // or when calendars finish loading (if preferences are already loaded)
@@ -731,53 +807,6 @@ export default function HomePage() {
             role="dialog"
             aria-label="Create event"
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => {
-              if (!isMobile || createSubmitting) return;
-              const touch = e.touches[0];
-              const target = e.target as HTMLElement;
-              const bottomSheet = createModalRef.current;
-              if (!bottomSheet) return;
-
-              const headerHeight = 80;
-              const rect = bottomSheet.getBoundingClientRect();
-              const touchY = touch.clientY - rect.top;
-              const scrollTop = bottomSheet.scrollTop;
-
-              const isInHeader = touchY < headerHeight && scrollTop === 0;
-              const isHeaderElement =
-                target.closest('[aria-label="Close"]') ||
-                target.closest("button[class*='p-1']");
-
-              if (isInHeader || (scrollTop === 0 && isHeaderElement)) {
-                setCreateIsDragging(true);
-                createDragStartY.current = touch.clientY;
-                createDragStartOffset.current = createDragOffset;
-                if (!isHeaderElement) {
-                  e.preventDefault();
-                }
-              }
-            }}
-            onTouchMove={(e) => {
-              if (!isMobile || !createIsDragging || createSubmitting) return;
-              const touch = e.touches[0];
-              const deltaY = touch.clientY - createDragStartY.current;
-              const newOffset = Math.max(0, createDragStartOffset.current + deltaY);
-              setCreateDragOffset(newOffset);
-              e.preventDefault();
-            }}
-            onTouchEnd={(e) => {
-              if (!isMobile || !createIsDragging) return;
-              setCreateIsDragging(false);
-
-              const threshold = Math.min(100, window.innerHeight * 0.2);
-              if (createDragOffset > threshold) {
-                setCreateOpen(false);
-                setTimeout(() => setCreateDragOffset(0), 300);
-              } else {
-                setCreateDragOffset(0);
-              }
-              e.preventDefault();
-            }}
           >
           <div
             className={cn(
@@ -792,16 +821,22 @@ export default function HomePage() {
               >
                 Event
               </div>
-              <button
-                className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                onClick={() =>
-                  createSubmitting ? null : setCreateOpen(false)
-                }
-                aria-label="Close"
-                disabled={createSubmitting}
-              >
-                <X className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
-              </button>
+              {!isMobile && (
+                <button
+                  className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!createSubmitting) {
+                      setCreateOpen(false);
+                    }
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  aria-label="Close"
+                  disabled={createSubmitting}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
           </div>
           <div
             className={cn(
@@ -827,7 +862,7 @@ export default function HomePage() {
                     value={createTitle}
                     onChange={(e) => setCreateTitle(e.target.value)}
                     disabled={createSubmitting}
-                    autoFocus
+                    autoFocus={!isMobile}
                   />
                 </div>
                 <div className="flex items-center gap-3">

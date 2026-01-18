@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { formatDateKey, cn } from "@/lib/utils";
 import { CalendarListItem } from "@/types/calendar";
+import { useTheme } from "@/components/theme-provider";
 
 type LinkedAccount = {
   accountId: string;
@@ -38,6 +39,7 @@ type LinkedAccount = {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
+  const { theme } = useTheme();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [events, setEvents] = useState<AllDayEvent[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -773,10 +775,14 @@ export default function HomePage() {
               <div className="w-full mb-0 sm:mb-0">
                 <div className="w-full rounded-lg overflow-hidden border border-[hsl(0,0%,85%)] dark:border-[hsl(0,0%,20%)] shadow-lg">
                   <Image
-                    src="/hero-image.png"
+                    src={
+                      theme === "dark"
+                        ? "/hero-image-dark.png"
+                        : "/hero-image-light.png"
+                    }
                     alt="Big Year calendar application screenshot"
-                    width={3476}
-                    height={2183}
+                    width={1858}
+                    height={1180}
                     className="w-full h-auto"
                     priority
                   />

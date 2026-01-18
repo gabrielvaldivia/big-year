@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
+  --background: 0 0% 98%;
   --foreground: 0 0% 5%;
 
   --card: 0 0% 100%;
@@ -71,6 +71,3 @@
 body {
   @apply bg-background text-foreground;
 }
-
-
-

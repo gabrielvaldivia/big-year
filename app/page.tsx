@@ -78,6 +78,8 @@ export default function HomePage() {
     useState<boolean>(false);
   const createDragStartY = useRef<number>(0);
   const createDragStartOffset = useRef<number>(0);
+  const [showHeaderBorder, setShowHeaderBorder] = useState<boolean>(false);
+  const scrollableContainerRef = useRef<HTMLDivElement | null>(null);
 
   const mergeCalendarColorsWithDefaults = (
     calendars: CalendarListItem[],
@@ -280,6 +282,42 @@ export default function HomePage() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Header border on scroll
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    if (!scrollableContainerRef.current) return;
+
+    const container = scrollableContainerRef.current;
+    // Find the scrollable element inside (YearCalendar's internal div with overflow-y-auto)
+    const scrollableElement = container.querySelector(
+      '[class*="overflow-y-auto"]'
+    ) as HTMLElement;
+    if (!scrollableElement) return;
+
+    const handleScroll = () => {
+      const scrollTop = scrollableElement.scrollTop;
+      const scrollHeight = scrollableElement.scrollHeight;
+      const clientHeight = scrollableElement.clientHeight;
+      const hasScrolled = scrollTop > 0;
+      const hasMoreContent = scrollHeight > clientHeight;
+      setShowHeaderBorder(hasScrolled && hasMoreContent);
+    };
+
+    // Check initial state
+    handleScroll();
+
+    scrollableElement.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+    // Also listen to resize in case content changes
+    window.addEventListener("resize", handleScroll, { passive: true });
+
+    return () => {
+      scrollableElement.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [status, year, selectedCalendarIds]);
 
   // Animate create modal in from bottom on mobile
   useEffect(() => {
@@ -732,7 +770,7 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center">
-                <h1 className="text-xl font-semibold">Big Year</h1>
+                <h1 className="text-xl font-bold">Big Year</h1>
               </div>
               <div className="flex items-center gap-3">
                 <Button
@@ -789,44 +827,6 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-
-            <div
-              className="mt-16 sm:mt-24 grid grid-cols-1 md:grid-cols-3 gap-8"
-              id="features"
-            >
-              <div className="text-center p-6 rounded-2xl border border-[hsl(0,0%,85%)] dark:border-[hsl(0,0%,20%)]">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/[0.03] mb-4">
-                  <CalendarIcon className="h-6 w-6 text-primary opacity-60" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">All-Day Events</h3>
-                <p className="text-muted-foreground">
-                  See all your Google Calendar all-day events displayed across
-                  the entire year in a single, comprehensive view.
-                </p>
-              </div>
-
-              <div className="text-center p-6 rounded-2xl border border-[hsl(0,0%,85%)] dark:border-[hsl(0,0%,20%)]">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/[0.03] mb-4">
-                  <Clock className="h-6 w-6 text-primary opacity-60" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Easy Planning</h3>
-                <p className="text-muted-foreground">
-                  Navigate through years effortlessly, create new events, and
-                  manage your calendar directly from the interface.
-                </p>
-              </div>
-
-              <div className="text-center p-6 rounded-2xl border border-[hsl(0,0%,85%)] dark:border-[hsl(0,0%,20%)]">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/[0.03] mb-4">
-                  <Settings className="h-6 w-6 text-primary opacity-60" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Customizable</h3>
-                <p className="text-muted-foreground">
-                  Choose which calendars to display, customize colors, and
-                  adjust settings to match your preferences.
-                </p>
-              </div>
-            </div>
           </section>
         </main>
 
@@ -834,12 +834,6 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                <p className="text-sm text-muted-foreground">
-                  © {new Date().getFullYear()} Big Year. All rights reserved.
-                </p>
-                <span className="hidden sm:inline text-muted-foreground">
-                  •
-                </span>
                 <p className="text-sm text-muted-foreground">
                   Created by{" "}
                   <Link
@@ -877,7 +871,13 @@ export default function HomePage() {
   // Show calendar interface when authenticated
   return (
     <div className="h-screen w-screen flex flex-col">
-      <div className="grid grid-cols-3 items-center p-3 bg-[hsl(0,0%,99%)] dark:bg-[hsl(0,0%,8%)] border-b border-[hsl(0,0%,85%)] dark:border-[hsl(0,0%,20%)]">
+      <div
+        className={cn(
+          "grid grid-cols-3 items-center p-3 bg-[hsl(0,0%,99%)] dark:bg-[hsl(0,0%,8%)]",
+          showHeaderBorder &&
+            "border-b border-[hsl(0,0%,85%)] dark:border-[hsl(0,0%,20%)]"
+        )}
+      >
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -1480,7 +1480,7 @@ export default function HomePage() {
           </aside>
         </>
       )}
-      <div className="flex-1 min-h-0">
+      <div ref={scrollableContainerRef} className="flex-1 min-h-0">
         <YearCalendar
           year={year}
           events={visibleEvents}

@@ -137,6 +137,7 @@ export function YearCalendar({
   onDeleteEvent,
   onDayClick,
   onUpdateEvent,
+  onCreateEvent,
   writableCalendars = [],
   writableAccountsWithCalendars = [],
   showDaysOfWeek = false,
@@ -153,6 +154,12 @@ export function YearCalendar({
   onDayClick?: (dateKey: string) => void;
   onUpdateEvent?: (event: {
     id: string;
+    title: string;
+    calendarId: string;
+    startDate: string;
+    endDate?: string;
+  }) => Promise<void> | void;
+  onCreateEvent?: (event: {
     title: string;
     calendarId: string;
     startDate: string;
@@ -228,6 +235,8 @@ export function YearCalendar({
     event: AllDayEvent | null;
     x: number;
     y: number;
+    creatingDateKey?: string;
+    position?: { above: boolean; left: boolean };
   }>({ event: null, x: 0, y: 0 });
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
   const [isEditing, setIsEditing] = React.useState<boolean>(false);
@@ -390,7 +399,7 @@ export function YearCalendar({
   }, [gridDims.cols, gridDims.cell, year]);
   React.useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
-      if (!popover.event) return;
+      if (!popover.event && !popover.creatingDateKey) return;
       if (popoverRef.current && e.target instanceof Node) {
         if (!popoverRef.current.contains(e.target)) {
           setPopover({ event: null, x: 0, y: 0 });
@@ -424,11 +433,11 @@ export function YearCalendar({
       document.removeEventListener("mousedown", onDocMouseDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [popover.event, menuOpen]);
+  }, [popover.event, popover.creatingDateKey, menuOpen]);
 
   React.useEffect(() => {
     if (popover.event) {
-      // Initialize edit state when popover opens
+      // Initialize edit state when popover opens for editing
       setEditTitle(popover.event.summary);
       setEditCalendarId(popover.event.calendarId || "");
       setEditStartDate(popover.event.startDate);
@@ -470,10 +479,129 @@ export function YearCalendar({
         setEditHasEndDate(false);
         setEditEndDate("");
       }
-    }
-  }, [popover.event, isMobile]);
+    } else if (popover.creatingDateKey) {
+      // Initialize create state when popover opens for creating
+      setEditTitle("");
+      setEditCalendarId("");
+      setEditStartDate(popover.creatingDateKey);
+      setEditHasEndDate(false);
+      setEditEndDate("");
 
-  function formatDisplayRange(startIsoDate: string, endIsoDate: string) {
+      // Animate bottom sheet in from bottom on mobile
+      if (isMobile) {
+        setIsAnimatingIn(true);
+        setIsDragging(false);
+        // Start off-screen at bottom
+        setDragOffset(
+          typeof window !== "undefined" ? window.innerHeight : 1000
+        );
+        // Trigger animation to slide up after mount
+        const timeout = setTimeout(() => {
+          setDragOffset(0);
+          setTimeout(() => setIsAnimatingIn(false), 300);
+        }, 10);
+        return () => clearTimeout(timeout);
+      } else {
+        setDragOffset(0);
+        setIsDragging(false);
+        setIsAnimatingIn(false);
+      }
+    }
+  }, [popover.event, popover.creatingDateKey, isMobile]);
+
+  function calculatePopoverPosition(
+  clickX: number,
+  clickY: number,
+  clickWidth: number,
+  clickHeight: number,
+  clickClientX?: number,
+  clickClientY?: number
+): { x: number; y: number; position: { above: boolean; left: boolean } } {
+  const popoverWidth = 400; // max-w-md
+  const popoverHeight = 300; // estimated height
+  const padding = 2; // minimal spacing from click point
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1920;
+  const viewportHeight =
+    typeof window !== "undefined" ? window.innerHeight : 1080;
+
+  // Use actual click coordinates if available, otherwise use center of cell
+  const targetX = clickClientX !== undefined ? clickClientX : clickX + clickWidth / 2;
+  const targetY = clickClientY !== undefined ? clickClientY : clickY + clickHeight / 2;
+
+  // Determine horizontal position - check if we need to flip
+  const spaceRight = viewportWidth - targetX;
+  const spaceLeft = targetX;
+  const left = spaceRight < popoverWidth && spaceLeft > spaceRight;
+
+  // Determine vertical position - check if we need to flip
+  const spaceBelow = viewportHeight - targetY;
+  const spaceAbove = targetY;
+  const above = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+
+  // Calculate final position - keep popover edge aligned with click point
+  // Note: transform translateX(-100%) means right edge aligns with x, translateY(-100%) means bottom edge aligns with y
+  let x: number;
+  let y: number;
+
+  if (left) {
+    // Position to the left: align right edge of popover with click point (using translateX(-100%))
+    x = targetX;
+    // If popover would extend off left edge, adjust to keep it as close as possible
+    if (x - popoverWidth < padding) {
+      // Position so right edge is as close to click as possible while staying in bounds
+      x = Math.min(targetX, padding + popoverWidth);
+    }
+  } else {
+    // Position to the right: align left edge of popover with click point
+    x = targetX + padding;
+    // If popover would extend off right edge, adjust to keep it as close as possible
+    if (x + popoverWidth > viewportWidth - padding) {
+      // Position so left edge is as close to click as possible while staying in bounds
+      x = Math.max(targetX - popoverWidth + padding, viewportWidth - popoverWidth - padding);
+    }
+  }
+
+  if (above) {
+    // Position above: align bottom edge of popover with click point (using translateY(-100%))
+    y = targetY;
+    // If popover would extend off top edge, adjust to keep it as close as possible
+    if (y - popoverHeight < padding) {
+      // Position so bottom edge is as close to click as possible while staying in bounds
+      y = Math.min(targetY, padding + popoverHeight);
+    }
+  } else {
+    // Position below: align top edge of popover with click point
+    y = targetY + padding;
+    // If popover would extend off bottom edge, adjust to keep it as close as possible
+    if (y + popoverHeight > viewportHeight - padding) {
+      // Position so top edge is as close to click as possible while staying in bounds
+      y = Math.max(targetY - popoverHeight + padding, viewportHeight - popoverHeight - padding);
+    }
+  }
+
+  // Final bounds check to ensure popover stays within viewport
+  if (left) {
+    // For left positioning, ensure right edge (x) doesn't go off right edge
+    x = Math.min(x, viewportWidth - padding);
+    // And ensure left edge (x - popoverWidth) doesn't go off left edge
+    x = Math.max(x, padding + popoverWidth);
+  } else {
+    x = Math.max(padding, Math.min(x, viewportWidth - popoverWidth - padding));
+  }
+
+  if (above) {
+    // For above positioning, ensure bottom edge (y) doesn't go off bottom edge
+    y = Math.min(y, viewportHeight - padding);
+    // And ensure top edge (y - popoverHeight) doesn't go off top edge
+    y = Math.max(y, padding + popoverHeight);
+  } else {
+    y = Math.max(padding, Math.min(y, viewportHeight - popoverHeight - padding));
+  }
+
+  return { x, y, position: { above, left } };
+}
+
+function formatDisplayRange(startIsoDate: string, endIsoDate: string) {
     const start = new Date(startIsoDate + "T00:00:00");
     const end = new Date(endIsoDate + "T00:00:00"); // exclusive
     const endInclusive = new Date(end.getTime() - 86400000);
@@ -558,7 +686,27 @@ export function YearCalendar({
                 onClick={(e) => {
                   // Event bars are in a separate overlay with pointer-events-auto,
                   // so clicks on them won't reach here. Only clicks on empty day areas will.
-                  onDayClick?.(key);
+                  if (signedIn && onCreateEvent) {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const pos = calculatePopoverPosition(
+                      rect.left,
+                      rect.top,
+                      rect.width,
+                      rect.height,
+                      e.clientX,
+                      e.clientY
+                    );
+                    setPopover({
+                      event: null,
+                      x: pos.x,
+                      y: pos.y,
+                      creatingDateKey: key,
+                      position: pos.position,
+                    });
+                    setIsEditing(true);
+                  } else {
+                    onDayClick?.(key);
+                  }
                 }}
               >
                 {isFirstOfMonth && cellWidth > 60 && (
@@ -702,10 +850,19 @@ export function YearCalendar({
                       const rect = (
                         e.currentTarget as HTMLDivElement
                       ).getBoundingClientRect();
+                      const pos = calculatePopoverPosition(
+                        rect.left,
+                        rect.top,
+                        rect.width,
+                        rect.height,
+                        e.clientX,
+                        e.clientY
+                      );
                       setPopover({
                         event: seg.ev,
-                        x: rect.left + rect.width / 2,
-                        y: rect.bottom + 8,
+                        x: pos.x,
+                        y: pos.y,
+                        position: pos.position,
                       });
                       setIsEditing(true);
                     }}
@@ -734,17 +891,19 @@ export function YearCalendar({
           ])}
         </div>
       </div>
-      {popover.event && isEditing && (
+      {((popover.event || popover.creatingDateKey) && isEditing) && (
         <>
           {isMobile && (
             <div
               className="fixed inset-0 bg-background/60 z-40"
-              onClick={() => {
-                if (!isSubmitting) {
-                  setIsEditing(false);
-                  setPopover({ event: null, x: 0, y: 0 });
-                }
-              }}
+                        onClick={() => {
+                          if (!isSubmitting) {
+                            setIsEditing(false);
+                            setPopover({ event: null, x: 0, y: 0 });
+                            setMenuOpen(false);
+                            setMenuPosition(null);
+                          }
+                        }}
               aria-hidden
             />
           )}
@@ -766,17 +925,21 @@ export function YearCalendar({
                       ? "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                       : "transform 0.3s ease-out",
                   }
-                : !isMobile && popover.x && popover.y
+                : !isMobile && popover.x !== undefined && popover.y !== undefined
                 ? {
                     top: `${popover.y}px`,
                     left: `${popover.x}px`,
-                    transform: "translateX(-50%)",
+                    transform: `${
+                      popover.position?.left ? "translateX(-100%)" : "translateX(0)"
+                    } ${
+                      popover.position?.above ? "translateY(-100%)" : "translateY(0)"
+                    }`,
                     maxWidth: "400px",
                   }
                 : {}
             }
             role="dialog"
-            aria-label="Edit event"
+            aria-label={popover.event ? "Edit event" : "Create event"}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => {
               if (!isMobile || isSubmitting) return;
@@ -839,43 +1002,44 @@ export function YearCalendar({
                   isMobile ? "text-lg font-semibold" : "font-semibold"
                 )}
               >
-                Event
+                {popover.event ? "Event" : "New Event"}
               </div>
               <div className="flex items-center gap-1">
-                <div className="relative" ref={menuRef}>
-                  <button
-                    ref={menuButtonRef}
-                    className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isMobile && menuButtonRef.current) {
-                        const rect =
-                          menuButtonRef.current.getBoundingClientRect();
-                        const menuWidth = 192; // w-48 = 192px
-                        const padding = 8;
-                        let left = rect.right - menuWidth;
-                        if (left < padding) {
-                          left = padding;
+                {popover.event && !popover.creatingDateKey && (
+                  <div className="relative" ref={menuRef}>
+                    <button
+                      ref={menuButtonRef}
+                      className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isMobile && menuButtonRef.current) {
+                          const rect =
+                            menuButtonRef.current.getBoundingClientRect();
+                          const menuWidth = 192; // w-48 = 192px
+                          const padding = 8;
+                          let left = rect.right - menuWidth;
+                          if (left < padding) {
+                            left = padding;
+                          }
+                          const maxLeft = window.innerWidth - menuWidth - padding;
+                          if (left > maxLeft) {
+                            left = maxLeft;
+                          }
+                          setMenuPosition({
+                            top: rect.bottom + 4,
+                            left,
+                          });
+                        } else {
+                          setMenuPosition(null);
                         }
-                        const maxLeft = window.innerWidth - menuWidth - padding;
-                        if (left > maxLeft) {
-                          left = maxLeft;
-                        }
-                        setMenuPosition({
-                          top: rect.bottom + 4,
-                          left,
-                        });
-                      } else {
-                        setMenuPosition(null);
-                      }
-                      setMenuOpen(!menuOpen);
-                    }}
-                    aria-label="More options"
-                  >
-                    <MoreHorizontal
-                      className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")}
-                    />
-                  </button>
+                        setMenuOpen(!menuOpen);
+                      }}
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal
+                        className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")}
+                      />
+                    </button>
                   {menuOpen && (
                     <div
                       className={cn(
@@ -899,7 +1063,7 @@ export function YearCalendar({
                         )}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (onHideEvent && popover.event) {
+                          if (onHideEvent && popover.event && !popover.creatingDateKey) {
                             onHideEvent(popover.event.id);
                           }
                           setPopover({ event: null, x: 0, y: 0 });
@@ -910,7 +1074,7 @@ export function YearCalendar({
                       >
                         Hide event
                       </button>
-                      {onDeleteEvent && popover.event && (
+                      {onDeleteEvent && popover.event && !popover.creatingDateKey && (
                         <button
                           className={cn(
                             "w-full text-left px-3 py-1.5 text-destructive hover:bg-destructive hover:text-destructive-foreground transition",
@@ -940,7 +1104,8 @@ export function YearCalendar({
                       )}
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
                 <button
                   className="text-muted-foreground hover:text-foreground flex-shrink-0 p-1"
                   onClick={() => {
@@ -1183,7 +1348,6 @@ export function YearCalendar({
               <Button
                 className={cn(isMobile && "flex-1")}
                 onClick={async () => {
-                  if (!popover.event || !onUpdateEvent) return;
                   if (!editTitle.trim()) {
                     alert("Title is required");
                     return;
@@ -1202,19 +1366,30 @@ export function YearCalendar({
                   }
                   try {
                     setIsSubmitting(true);
-                    await onUpdateEvent({
-                      id: popover.event.id,
-                      title: editTitle.trim(),
-                      calendarId: editCalendarId,
-                      startDate: editStartDate,
-                      endDate: editHasEndDate ? editEndDate : undefined,
-                    });
+                    if (popover.event && onUpdateEvent) {
+                      // Editing existing event
+                      await onUpdateEvent({
+                        id: popover.event.id,
+                        title: editTitle.trim(),
+                        calendarId: editCalendarId,
+                        startDate: editStartDate,
+                        endDate: editHasEndDate ? editEndDate : undefined,
+                      });
+                    } else if (popover.creatingDateKey && onCreateEvent) {
+                      // Creating new event
+                      await onCreateEvent({
+                        title: editTitle.trim(),
+                        calendarId: editCalendarId,
+                        startDate: editStartDate,
+                        endDate: editHasEndDate ? editEndDate : undefined,
+                      });
+                    }
                     setIsEditing(false);
                     setPopover({ event: null, x: 0, y: 0 });
                     setMenuOpen(false);
                     setMenuPosition(null);
                   } catch (err) {
-                    alert("Failed to update event");
+                    alert(popover.event ? "Failed to update event" : "Failed to create event");
                   } finally {
                     setIsSubmitting(false);
                   }

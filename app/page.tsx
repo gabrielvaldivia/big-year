@@ -1600,6 +1600,21 @@ export default function HomePage() {
             } catch {}
             await onRefresh();
           }}
+          onCreateEvent={async (event) => {
+            try {
+              await fetch("/api/events", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title: event.title,
+                  calendarId: event.calendarId,
+                  startDate: event.startDate,
+                  endDate: event.endDate,
+                }),
+              });
+            } catch {}
+            await onRefresh();
+          }}
           onDeleteEvent={async (id) => {
             try {
               await fetch("/api/events", {
